@@ -27,7 +27,7 @@ def produce_particles(n):
             ylist.append(y)
     return xlist, ylist
 
-def calculate_total_energy(xlist, ylist):
+def total_energy(xlist, ylist):
     """
     Calculates the total system energy for a given xlist, ylist
     """
@@ -50,6 +50,33 @@ def move_particle(scale):
     Takes particle, moves random length in random direction
     """
 
+def annealing_step(xlist, ylist, T):
+    """Computes one step of the annealing algorithm"""
+
+    # step 1: make move
+    xlist_new, ylist_new = move_particles(xlist, ylist)
+    
+    # sample U
+    U = random.random()
+
+    # compute alpha
+    h_new = total_energy(xlist_new, ylist_new)
+    h = total_energy(xlist, ylist)
+    alpha = min(np.exp((h_new - h) / T), 1)
+    
+    # determine which list to return
+    if U < alpha:
+        return xlist_new, ylist_new
+    return xlist, ylist
+
+def annealing_algorithm(a, b, nsteps, xlist, ylist):
+    """Computes the total annealing algorithm"""
+
+    for n in range(nsteps):
+        T_n = (a) / (np.log(n + b))
+        xlist, ylist = annealing_step(xlist, ylist, T_n)
+
+    return xlist, ylist
 
 if __name__ == "__main__":
     xlist, ylist = produce_particles(N)
