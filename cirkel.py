@@ -10,11 +10,11 @@ import random
 
 from numpy.core.numeric import _array_equal_dispatcher
 
-N = 2
-SCALE = 0.5
+N = 10
+SCALE = 0.05
 A = 1
 B = 2
-NSTEPS = 100
+NSTEPS = 10000
 
 def produce_particles(n):
     """
@@ -71,25 +71,39 @@ def move_inside(scale, particle):
         position = move_particle(scale, particle)
     return position
 
-def move_particles(scale, x_list, y_list):
+# def move_particles(scale, x_list, y_list):
+#     """
+#     Takes lists of x-coordinates and y-coordinates, moves all in random
+#     direction but does not move outside the circle.
+#     """
+#     index = 0
+#     while index < len(x_list):
+#         particle = [x_list[index], y_list[index]]
+#         particle = move_inside(scale, particle)
+#         x_list[index] = particle[0]
+#         y_list[index] = particle[1]
+#         index += 1
+#     return x_list, y_list
+
+def move_particles(scale, xlist, ylist):
     """
     Takes lists of x-coordinates and y-coordinates, moves all in random
     direction but does not move outside the circle.
     """
-    index = 0
-    while index < len(x_list):
-        particle = [x_list[index], y_list[index]]
-        particle = move_inside(scale, particle)
-        x_list[index] = particle[0]
-        y_list[index] = particle[1]
-        index += 1
-    return x_list, y_list
+    xlist_new = []
+    ylist_new = []
+
+    for i in range(len(xlist)):
+        xnew, ynew = move_inside(scale, [xlist[i], ylist[i]])
+        xlist_new.append(xnew)
+        ylist_new.append(ynew)
+
+    return xlist_new, ylist_new
 
 def annealing_step(xlist, ylist, T):
     """Computes one step of the annealing algorithm"""
 
     # step 1: make move
-    print(xlist)
     xlist_new, ylist_new = move_particles(SCALE, xlist, ylist)
     # print(xlist)
     # sample U
@@ -101,7 +115,7 @@ def annealing_step(xlist, ylist, T):
     h_new = total_energy(xlist_new, ylist_new)
     h = total_energy(xlist, ylist)
     # print(h, h_new)
-    alpha = min(np.exp((h_new - h) / T), 1)
+    alpha = min(np.exp((h - h_new) / T), 1)
     
     # determine which list to return
     if U < alpha:
@@ -126,8 +140,15 @@ if __name__ == "__main__":
     # for i in range(100):
         # xlist, ylist = move_particles(SCALE, xlist, ylist)
 
-    # plt.xlim([-1, 1])
-    # plt.ylim([-1, 1])
+    x_circle, y_circle = [], []
+    for theta in np.arange(0, 2 * np.pi, 0.01):
+        x_circle.append(np.cos(theta))
+        y_circle.append(np.sin(theta))
+        
+    plt.plot(x_circle, y_circle, 'b--')
+
+    plt.xlim([-1, 1])
+    plt.ylim([-1, 1])
     
-    # plt.plot(xlist, ylist, "ro")
-    # plt.show()
+    plt.plot(xlist, ylist, "ro")
+    plt.show()
