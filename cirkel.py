@@ -9,8 +9,9 @@ import matplotlib.pyplot as plt
 import random
 
 from numpy.core.numeric import _array_equal_dispatcher
+from numpy.lib.function_base import diff
 
-N = 10
+N = 3
 SCALE = 0.05
 A = 1
 B = 2
@@ -21,33 +22,56 @@ def produce_particles(n):
     Produces n particles at random positions in circle, i.e. gives random x and
     y as coordinates. Adds to list. Returns: list of n [x, y] lists.
     """
-    xlist, ylist = [], []
-    while len(xlist) < n:
+    particles = []
+    
+    while len(particles) < n:
         x = random.random() * 2 - 1
         y = random.random() * 2 - 1
         r = math.sqrt(x**2 + y**2)
         if r < 1:
-            xlist.append(x)
-            ylist.append(y)
-    return xlist, ylist
+            particles.append((x, y))
+    
+    particles = np.array(particles)
+    return particles
 
-def total_energy(xlist, ylist):
+def calculate_energy(particles):
     """
-    Calculates the total system energy for a given xlist, ylist
+    Calculates the total system energy for a given particles array
     """
 
     total_energy = 0
-    N = len(xlist)
 
-    for i in range(N):
-        for j in range(N):
-            if i != j:
-                r_ij = ((xlist[i] - xlist[j]) ** 2 + (ylist[i] - ylist[j]) ** 2) ** (1 / 2)
-                total_energy += 1 / r_ij
+    for index in range(len(particles)):
+        selected_particle = particles[index]
+        difference_vectors = particles - selected_particle
+        # # exclude the selected particle
+        difference_vectors = np.delete(difference_vectors, index, 0)
+        # source: https://stackoverflow.com/questions/7741878/how-to-apply-numpy-linalg-norm-to-each-row-of-a-matrix
+        distances = np.sqrt(np.einsum('ij,ij->i', difference_vectors, difference_vectors))
 
-    # account for double counts (but doesn't really matter)
-    total_energy /= 2
+        energy_particle = np.sum(distances ** (-1))
+        total_energy += energy_particle
+    
     return total_energy
+
+def calculate_force_vectors(particles):
+    """Calculates the force vector on each particle"""
+
+    force_vectors = []
+
+    for index in range(len(particles)):
+        selected_particle = particles[index]
+        difference_vectors = particles - selected_particle
+        # # exclude the selected particle
+        difference_vectors = np.delete(difference_vectors, index, 0)
+        # source: https://stackoverflow.com/questions/7741878/how-to-apply-numpy-linalg-norm-to-each-row-of-a-matrix
+        distances = np.sqrt(np.einsum('ij,ij->i', difference_vectors, difference_vectors))
+        
+        division_array = distances ** 3
+        force_vector_particle = -np.sum(difference_vectors / division_array[:,None], 0)
+        force_vectors.append(force_vector_particle)
+    
+    return np.array(force_vectors)
 
 def move_particle(scale, particle):
     """
@@ -71,20 +95,6 @@ def move_inside(scale, particle):
         position = move_particle(scale, particle)
     return position
 
-# def move_particles(scale, x_list, y_list):
-#     """
-#     Takes lists of x-coordinates and y-coordinates, moves all in random
-#     direction but does not move outside the circle.
-#     """
-#     index = 0
-#     while index < len(x_list):
-#         particle = [x_list[index], y_list[index]]
-#         particle = move_inside(scale, particle)
-#         x_list[index] = particle[0]
-#         y_list[index] = particle[1]
-#         index += 1
-#     return x_list, y_list
-
 def move_particles(scale, xlist, ylist):
     """
     Takes lists of x-coordinates and y-coordinates, moves all in random
@@ -94,9 +104,9 @@ def move_particles(scale, xlist, ylist):
     ylist_new = []
 
     for i in range(len(xlist)):
-        xnew, ynew = move_inside(scale, [xlist[i], ylist[i]])
-        xlist_new.append(xnew)
-        ylist_new.append(ynew)
+        x_new, y_new = move_inside(scale, [xlist[i], ylist[i]])
+        xlist_new.append(x_new)
+        ylist_new.append(y_new)
 
     return xlist_new, ylist_new
 
@@ -105,13 +115,9 @@ def annealing_step(xlist, ylist, T):
 
     # step 1: make move
     xlist_new, ylist_new = move_particles(SCALE, xlist, ylist)
-    # print(xlist)
     # sample U
     U = random.random()
-    # print(xlist, xlist_new)
     # compute alpha
-    # print(xlist_new, ylist_new)
-    # print(xlist, ylist)
     h_new = total_energy(xlist_new, ylist_new)
     h = total_energy(xlist, ylist)
     # print(h, h_new)
@@ -131,11 +137,14 @@ def annealing_algorithm(a, b, nsteps, xlist, ylist):
     return xlist, ylist
 
 if __name__ == "__main__":
-    xlist, ylist = produce_particles(N)
-    # print(total_energy([1, -1], [1, -1]))
-    # print(total_energy([0, 0], [1, -1]))
+    particles = produce_particles(N)
+    energy = calculate_energy(particles)
+    force_vectors = calculate_force_vectors(particles)
 
-    xlist, ylist = annealing_algorithm(A, B, NSTEPS, xlist, ylist)
+    print(particles)
+    print(force_vectors)
+
+    # xlist, ylist = annealing_algorithm(A, B, NSTEPS, xlist, ylist)
 
     # for i in range(100):
         # xlist, ylist = move_particles(SCALE, xlist, ylist)
@@ -150,5 +159,8 @@ if __name__ == "__main__":
     plt.xlim([-1, 1])
     plt.ylim([-1, 1])
     
-    plt.plot(xlist, ylist, "ro")
+    x_list = particles[:,0]
+    y_list = particles[:,1]
+
+    plt.plot(x_list, y_list, "ro")
     plt.show()
