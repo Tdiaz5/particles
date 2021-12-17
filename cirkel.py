@@ -110,41 +110,41 @@ def move_particles(scale, xlist, ylist):
 
     return xlist_new, ylist_new
 
-def annealing_step(xlist, ylist, T):
+def annealing_step(particles, T):
     """Computes one step of the annealing algorithm"""
 
     # step 1: make move
-    xlist_new, ylist_new = move_particles(SCALE, xlist, ylist)
+    particles_new = move_particles(SCALE, particles)
     # sample U
     U = random.random()
     # compute alpha
-    h_new = total_energy(xlist_new, ylist_new)
-    h = total_energy(xlist, ylist)
-    # print(h, h_new)
+    h_new = calculate_energy(particles_new)
+    h = calculate_energy(particles)
+
     alpha = min(np.exp((h - h_new) / T), 1)
     
     # determine which list to return
     if U < alpha:
-        return xlist_new, ylist_new
-    return xlist, ylist
+        return particles_new
+    return particles
 
-def annealing_algorithm(a, b, nsteps, xlist, ylist):
+def annealing_algorithm(a, b, nsteps, particles):
     """Computes the total annealing algorithm"""
 
     for n in range(nsteps):
         T_n = (a) / (np.log(n + b))
-        xlist, ylist = annealing_step(xlist, ylist, T_n)
-    return xlist, ylist
+        particles = annealing_step(particles, T_n)
+    return particles
 
 if __name__ == "__main__":
     particles = produce_particles(N)
-    energy = calculate_energy(particles)
-    force_vectors = calculate_force_vectors(particles)
+    # energy = calculate_energy(particles)
+    # force_vectors = calculate_force_vectors(particles)
 
-    print(particles)
-    print(force_vectors)
+    # print(particles)
+    # print(force_vectors)
 
-    # xlist, ylist = annealing_algorithm(A, B, NSTEPS, xlist, ylist)
+    particles = annealing_algorithm(A, B, NSTEPS, particles)
 
     # for i in range(100):
         # xlist, ylist = move_particles(SCALE, xlist, ylist)
