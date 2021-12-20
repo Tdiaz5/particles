@@ -11,11 +11,11 @@ import random
 from numpy.core.numeric import _array_equal_dispatcher
 from numpy.lib.function_base import diff
 
-N = 3
-SCALE = 0.05
-A = 1
-B = 2
-NSTEPS = 10000
+N = 23
+SCALE = 0.001
+A = 10
+B = 0.01
+NSTEPS = 1000
 
 def produce_particles(n):
     """
@@ -73,42 +73,17 @@ def calculate_force_vectors(particles):
     
     return np.array(force_vectors)
 
-def move_particle(scale, particle):
-    """
-    Takes particle, moves random length (< scale * r) in random direction,
-    returns new position.
-    """
-    length = scale * random.random()
-    direction = 2 * math.pi * random.random()
-    x_move = length * math.cos(direction)
-    y_move = length * math.sin(direction)
-    x = particle[0]
-    y = particle[1]
-    x_new = x + x_move
-    y_new = y + y_move
-    return [x_new, y_new]
+def move_particles(scale, particles):
+    force_vectors = calculate_force_vectors(particles)
+    random_step_magnitudes = scale * np.random.rand(N)
 
-def move_inside(scale, particle):
-    """Calls move_particle function until the particle is inside circle."""
-    position = move_particle(scale, particle)
-    while math.sqrt(position[0]**2 + position[1]**2) > 1:
-        position = move_particle(scale, particle)
-    return position
+    steps = force_vectors * random_step_magnitudes[:,None]
+    particles = particles + steps
+    
+    distance_to_origin = np.sqrt(np.einsum('ij,ij->i', particles, particles))
+    particles = np.where(distance_to_origin[:,None] > 1, particles / distance_to_origin[:,None], particles)
 
-def move_particles(scale, xlist, ylist):
-    """
-    Takes lists of x-coordinates and y-coordinates, moves all in random
-    direction but does not move outside the circle.
-    """
-    xlist_new = []
-    ylist_new = []
-
-    for i in range(len(xlist)):
-        x_new, y_new = move_inside(scale, [xlist[i], ylist[i]])
-        xlist_new.append(x_new)
-        ylist_new.append(y_new)
-
-    return xlist_new, ylist_new
+    return particles
 
 def annealing_step(particles, T):
     """Computes one step of the annealing algorithm"""
@@ -138,29 +113,27 @@ def annealing_algorithm(a, b, nsteps, particles):
 
 if __name__ == "__main__":
     particles = produce_particles(N)
-    # energy = calculate_energy(particles)
-    # force_vectors = calculate_force_vectors(particles)
-
-    # print(particles)
-    # print(force_vectors)
-
-    particles = annealing_algorithm(A, B, NSTEPS, particles)
-
-    # for i in range(100):
-        # xlist, ylist = move_particles(SCALE, xlist, ylist)
-
-    x_circle, y_circle = [], []
-    for theta in np.arange(0, 2 * np.pi, 0.01):
-        x_circle.append(np.cos(theta))
-        y_circle.append(np.sin(theta))
-        
-    plt.plot(x_circle, y_circle, 'b--')
-
-    plt.xlim([-1, 1])
-    plt.ylim([-1, 1])
     
-    x_list = particles[:,0]
-    y_list = particles[:,1]
+    # perform the algorithm
+    # particles = annealing_algorithm(A, B, NSTEPS, particles)
 
-    plt.plot(x_list, y_list, "ro")
-    plt.show()
+    for i in range(NSTEPS):
+        particles = move_particles(SCALE, particles)
+        x_circle, y_circle = [], []
+        for theta in np.arange(0, 2 * np.pi, 0.01):
+            x_circle.append(np.cos(theta))
+            y_circle.append(np.sin(theta))
+            
+        plt.plot(x_circle, y_circle, 'b--')
+
+        plt.xlim([-1, 1])
+        plt.ylim([-1, 1])
+        
+        x_list = particles[:,0]
+        y_list = particles[:,1]
+
+        plt.plot(x_list, y_list, "ro")
+
+        plt.draw()
+        plt.pause(0.001)
+        plt.clf()
