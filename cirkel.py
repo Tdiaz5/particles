@@ -12,10 +12,26 @@ from numpy.core.numeric import _array_equal_dispatcher
 from numpy.lib.function_base import diff
 
 N = 23
-SCALE = 0.001
-A = 10
-B = 0.01
+
+SCALE = 0.01
+ROTATION_SCALE = 0.01
+
 NSTEPS = 1000
+
+def logarithmic_cooling(n):
+    A = 10
+    B = 1
+    return (A) / (np.log(n + B))
+
+def exponential_cooling(n):
+    A = 10
+    B = 0.9
+    return A * (B) ** n
+
+def linear_multiplicative_cooling(n):
+    A = 10
+    B = 2
+    return A / (1 + B*n)
 
 def produce_particles(n):
     """
@@ -74,10 +90,22 @@ def calculate_force_vectors(particles):
     return np.array(force_vectors)
 
 def move_particles(scale, particles):
+    # first determine vectors of random length in the force vector direction
     force_vectors = calculate_force_vectors(particles)
     random_step_magnitudes = scale * np.random.rand(N)
-
     steps = force_vectors * random_step_magnitudes[:,None]
+
+    # now add a slight random rotation
+    thetas = ROTATION_SCALE * (2 * np.random.rand(N) - 1)
+    rotation_matrices = []
+
+    for theta in thetas:
+        rotation_matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+        rotation_matrices.append(rotation_matrix)
+
+    for index in range(N):
+        steps[index] = rotation_matrices[index].dot(steps[index])
+
     particles = particles + steps
     
     distance_to_origin = np.sqrt(np.einsum('ij,ij->i', particles, particles))
@@ -103,37 +131,37 @@ def annealing_step(particles, T):
         return particles_new
     return particles
 
-def annealing_algorithm(a, b, nsteps, particles):
+def plotting_step(particles):
+    x_circle, y_circle = [], []
+    for theta in np.arange(0, 2 * np.pi, 0.01):
+        x_circle.append(np.cos(theta))
+        y_circle.append(np.sin(theta))
+        
+    plt.plot(x_circle, y_circle, 'b--')
+
+    plt.xlim([-1, 1])
+    plt.ylim([-1, 1])
+    
+    x_list = particles[:,0]
+    y_list = particles[:,1]
+
+    plt.plot(x_list, y_list, "ro")
+
+    plt.draw()
+    plt.pause(0.001)
+    plt.clf()
+
+def annealing_algorithm(nsteps, particles, cooling_algorithm):
     """Computes the total annealing algorithm"""
+    # T_n = 5
 
     for n in range(nsteps):
-        T_n = (a) / (np.log(n + b))
+        T_n = cooling_algorithm(n)
         particles = annealing_step(particles, T_n)
+        plotting_step(particles)
     return particles
 
 if __name__ == "__main__":
     particles = produce_particles(N)
-    
-    # perform the algorithm
-    # particles = annealing_algorithm(A, B, NSTEPS, particles)
-
-    for i in range(NSTEPS):
-        particles = move_particles(SCALE, particles)
-        x_circle, y_circle = [], []
-        for theta in np.arange(0, 2 * np.pi, 0.01):
-            x_circle.append(np.cos(theta))
-            y_circle.append(np.sin(theta))
-            
-        plt.plot(x_circle, y_circle, 'b--')
-
-        plt.xlim([-1, 1])
-        plt.ylim([-1, 1])
+    particles = annealing_algorithm(NSTEPS, particles, linear_multiplicative_cooling)
         
-        x_list = particles[:,0]
-        y_list = particles[:,1]
-
-        plt.plot(x_list, y_list, "ro")
-
-        plt.draw()
-        plt.pause(0.001)
-        plt.clf()
