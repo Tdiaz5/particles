@@ -11,16 +11,12 @@ import random
 from numpy.core.numeric import _array_equal_dispatcher
 from numpy.lib.function_base import diff
 
-N = 23
-
-SCALE = 0.01
-ROTATION_SCALE = 0.01
-
+ROTATION_SCALE = 1
 NSTEPS = 1000
 
 def logarithmic_cooling(n):
-    A = 10
-    B = 1
+    A = 1000
+    B = 2
     return (A) / (np.log(n + B))
 
 def exponential_cooling(n):
@@ -71,7 +67,7 @@ def calculate_energy(particles):
     return total_energy
 
 def calculate_force_vectors(particles):
-    """Calculates the force vector on each particle"""
+    """Calculates the total force vector on each particle"""
 
     force_vectors = []
 
@@ -90,6 +86,8 @@ def calculate_force_vectors(particles):
     return np.array(force_vectors)
 
 def move_particles(scale, particles):
+    """Move the particles for one time step"""
+
     # first determine vectors of random length in the force vector direction
     force_vectors = calculate_force_vectors(particles)
     random_step_magnitudes = scale * np.random.rand(N)
@@ -99,25 +97,30 @@ def move_particles(scale, particles):
     thetas = ROTATION_SCALE * (2 * np.random.rand(N) - 1)
     rotation_matrices = []
 
+    # calculate a random rotation matrix for every vector
     for theta in thetas:
         rotation_matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
         rotation_matrices.append(rotation_matrix)
 
+    # apply random rotation matrix to every step vector: random rotation achieved
     for index in range(N):
         steps[index] = rotation_matrices[index].dot(steps[index])
 
     particles = particles + steps
-    
+
+    # to enforce the boundary, particles at a distance > 1 are normalized
+    # (thus setting their distance to 1). This ensures that all movement in the
+    # angular direction doesn't change, but the radial part doesn't change    
     distance_to_origin = np.sqrt(np.einsum('ij,ij->i', particles, particles))
     particles = np.where(distance_to_origin[:,None] > 1, particles / distance_to_origin[:,None], particles)
 
     return particles
 
-def annealing_step(particles, T):
+def annealing_step(particles, scale, T):
     """Computes one step of the annealing algorithm"""
 
     # step 1: make move
-    particles_new = move_particles(SCALE, particles)
+    particles_new = move_particles(scale, particles)
     # sample U
     U = random.random()
     # compute alpha
@@ -132,36 +135,53 @@ def annealing_step(particles, T):
     return particles
 
 def plotting_step(particles):
+    """Plots one step of the iteration"""
+
     x_circle, y_circle = [], []
     for theta in np.arange(0, 2 * np.pi, 0.01):
         x_circle.append(np.cos(theta))
         y_circle.append(np.sin(theta))
         
-    plt.plot(x_circle, y_circle, 'b--')
+    plt.plot(x_circle, y_circle, 'k')
 
-    plt.xlim([-1, 1])
-    plt.ylim([-1, 1])
+    plt.xlim([-1.1, 1.1])
+    plt.ylim([-1.1, 1.1])
     
     x_list = particles[:,0]
     y_list = particles[:,1]
 
     plt.plot(x_list, y_list, "ro")
 
-    plt.draw()
-    plt.pause(0.001)
-    plt.clf()
-
-def annealing_algorithm(nsteps, particles, cooling_algorithm):
+def annealing_algorithm(nsteps, particles, scale, cooling_algorithm, animation):
     """Computes the total annealing algorithm"""
-    # T_n = 5
 
     for n in range(nsteps):
         T_n = cooling_algorithm(n)
-        particles = annealing_step(particles, T_n)
+        particles = annealing_step(particles, scale, T_n)
+
+        if animation:
+            plotting_step(particles)
+            plt.draw()
+            plt.pause(0.001)
+            plt.clf()
+    
+    E_final = calculate_energy(particles)
+    print(f"Final energy: {E_final}")
+
+    if E_final < 2928:
         plotting_step(particles)
+        plt.savefig(f"plots/N{N}_E_{round(E_final, 2)}.png")
+        plt.clf()
+
     return particles
 
 if __name__ == "__main__":
-    particles = produce_particles(N)
-    particles = annealing_algorithm(NSTEPS, particles, linear_multiplicative_cooling)
-        
+    # set square figure
+    plt.rcParams["figure.figsize"] = (8, 8)
+    # on higher N, it is necessary to decrease scale. Sometimes it turns into
+    # a twitchy mess with a high SCALE and high N
+    N = 50
+    for i in range(10):
+        for scale in np.arange(0.0005, 0.003, 0.0005):
+            particles = produce_particles(N)
+            particles = annealing_algorithm(NSTEPS, particles, scale, logarithmic_cooling, False)
